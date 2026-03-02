@@ -62,40 +62,37 @@ jobs:
           scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:~/refit/docker-compose.prod.yml
           scp -o StrictHostKeyChecking=no nginx/default.conf ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:~/refit/nginx/default.conf
 
+      - name: .env 생성
+        run: |
+          cat > .env <<EOF
+          GHCR_OWNER=${{ env.GHCR_OWNER_LC }}
+          GHCR_REPO=${{ env.GHCR_REPO_LC }}
+          APP_IMAGE_TAG=${{ github.sha }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_EXP_SECONDS=3600
+          MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+          MYSQL_USER=${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}
+          EOF
+
+      - name: 서버로 .env 업로드
+        run: |
+          scp -o StrictHostKeyChecking=no .env ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:~/refit/.env
+
       - name: 서버에서 compose 재기동
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} 'bash -se' <<'REMOTE'
             set -euo pipefail
             cd ~/refit
 
-            cat > .env <<EOF
-            GHCR_OWNER=${GHCR_OWNER}
-            GHCR_REPO=${GHCR_REPO}
-            APP_IMAGE_TAG=${GITHUB_SHA}
-            JWT_SECRET=${JWT_SECRET}
-            JWT_ACCESS_EXP_SECONDS=3600
-            MYSQL_DATABASE=${MYSQL_DATABASE}
-            MYSQL_USER=${MYSQL_USER}
-            MYSQL_PASSWORD=${MYSQL_PASSWORD}
-            MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-            EOF
-
             chmod 600 .env
 
-            docker login ghcr.io -u "${GHCR_OWNER}" -p "${GHCR_TOKEN}"
+            docker login ghcr.io -u "$(grep -E '^GHCR_OWNER=' .env | cut -d= -f2)" -p "$(grep -E '^GHCR_TOKEN=' .env | cut -d= -f2)"
 
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml up -d
 
             docker image prune -f
           REMOTE
-        env:
-          GHCR_OWNER: ${{ env.GHCR_OWNER_LC }}
-          GHCR_REPO: ${{ env.GHCR_REPO_LC }}
-          GITHUB_SHA: ${{ github.sha }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
