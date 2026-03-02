@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-exp-seconds: ${JWT_ACCESS_EXP_SECONDS:3600}
+
+logging:
+  level:
+    org.hibernate.SQL: warn
