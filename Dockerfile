@@ -1,5 +1,5 @@
 # 빌드 스테이지
-FROM gradle:8.10.2-jdk17 AS builder
+FROM gradle:8.14.2-jdk17 AS builder
 WORKDIR /app
 COPY . .
 RUN gradle clean bootJar -x test
