@@ -36,7 +36,7 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    @Operation(summary = "로그인", description = "성공 시 JWT(access token) 발급 + auth_log 기록")
+    @Operation(summary = "로그인", description = "성공 시 Access/Refresh 토큰 발급 + auth_log 기록")
     @ApiResponse(
             responseCode = "200",
             description = "OK",
@@ -55,7 +55,23 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(req, httpReq));
     }
 
-    @Operation(summary = "로그아웃", description = "Authorization: Bearer {token} 필요. Redis 블랙리스트 등록 + auth_log.logout_at_ms 갱신")
+    @Operation(summary = "토큰 재발급", description = "Refresh Token으로 Access/Refresh 재발급(회전)")
+    @ApiResponse(
+            responseCode = "200",
+            description = "OK",
+            content = @Content(schema = @Schema(implementation = AuthResponse.class))
+    )
+    @ApiResponse(
+            responseCode = "401",
+            description = "REFRESH_TOKEN_INVALID",
+            content = @Content(schema = @Schema(implementation = java.util.Map.class))
+    )
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody TokenRefreshRequest req) {
+        return ResponseEntity.ok(authService.refresh(req));
+    }
+
+    @Operation(summary = "로그아웃", description = "Authorization: Bearer {accessToken} 필요. Access 블랙리스트 등록 + Refresh 폐기 + auth_log.logout_at_ms 갱신")
     @ApiResponse(
             responseCode = "200",
             description = "OK",
@@ -63,7 +79,7 @@ public class AuthController {
     )
     @ApiResponse(
             responseCode = "401",
-            description = "UNAUTHORIZED/AUTH_LOG_NOT_FOUND",
+            description = "UNAUTHORIZED",
             content = @Content(schema = @Schema(implementation = java.util.Map.class))
     )
     @PostMapping("/logout")

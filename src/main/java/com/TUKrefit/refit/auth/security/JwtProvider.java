@@ -14,25 +14,52 @@ import java.util.UUID;
 @Component
 public class JwtProvider {
 
+    private static final String CLAIM_TYP = "typ";
+    private static final String TYP_ACCESS = "access";
+    private static final String TYP_REFRESH = "refresh";
+
     private final SecretKey key;
-    private final long expSeconds;
+    private final long accessExpSeconds;
+    private final long refreshExpSeconds;
 
     public JwtProvider(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.access-token-exp-seconds}") long expSeconds
+            @Value("${app.jwt.access-token-exp-seconds}") long accessExpSeconds,
+            @Value("${app.jwt.refresh-token-exp-seconds}") long refreshExpSeconds
     ) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.expSeconds = expSeconds;
+        this.accessExpSeconds = accessExpSeconds;
+        this.refreshExpSeconds = refreshExpSeconds;
     }
 
     public String createAccessToken(String userId, String authId, long issuedAtMs) {
-        long expMs = issuedAtMs + expSeconds * 1000L;
+        long expMs = issuedAtMs + accessExpSeconds * 1000L;
         String jti = UUID.randomUUID().toString();
 
         return Jwts.builder()
                 .subject(userId)
-                .id(jti) // 표준 클레임 jti
-                .claims(Map.of("authId", authId))
+                .id(jti)
+                .claims(Map.of(
+                        "authId", authId,
+                        CLAIM_TYP, TYP_ACCESS
+                ))
+                .issuedAt(new Date(issuedAtMs))
+                .expiration(new Date(expMs))
+                .signWith(key)
+                .compact();
+    }
+
+    public String createRefreshToken(String userId, String authId, long issuedAtMs) {
+        long expMs = issuedAtMs + refreshExpSeconds * 1000L;
+        String jti = UUID.randomUUID().toString();
+
+        return Jwts.builder()
+                .subject(userId)
+                .id(jti)
+                .claims(Map.of(
+                        "authId", authId,
+                        CLAIM_TYP, TYP_REFRESH
+                ))
                 .issuedAt(new Date(issuedAtMs))
                 .expiration(new Date(expMs))
                 .signWith(key)
@@ -59,13 +86,21 @@ public class JwtProvider {
         return parse(token).getPayload().getId();
     }
 
-    public long getExpMs(String token) {
-        Date d = parse(token).getPayload().getExpiration();
-        return (d == null) ? 0L : d.getTime();
+    public String getTyp(String token) {
+        Object v = parse(token).getPayload().get(CLAIM_TYP);
+        return (v == null) ? null : v.toString();
     }
 
-    public long getIatMs(String token) {
-        Date d = parse(token).getPayload().getIssuedAt();
+    public boolean isAccessToken(String token) {
+        return TYP_ACCESS.equals(getTyp(token));
+    }
+
+    public boolean isRefreshToken(String token) {
+        return TYP_REFRESH.equals(getTyp(token));
+    }
+
+    public long getExpMs(String token) {
+        Date d = parse(token).getPayload().getExpiration();
         return (d == null) ? 0L : d.getTime();
     }
 }

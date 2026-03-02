@@ -32,10 +32,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = header.substring(7);
         try {
-            // 1) 서명/만료 검증 (parse 내부)
+            // access 토큰만 인증에 사용
+            if (!jwtProvider.isAccessToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String userId = jwtProvider.getUserId(token);
 
-            // 2) 블랙리스트 체크
+            // 블랙리스트 체크
             String jti = jwtProvider.getJti(token);
             if (tokenBlacklistService.isBlacklisted(jti)) {
                 filterChain.doFilter(request, response);

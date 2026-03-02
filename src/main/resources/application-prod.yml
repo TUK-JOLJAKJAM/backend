@@ -20,7 +20,8 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    access-token-exp-seconds: ${JWT_ACCESS_EXP_SECONDS:3600}
+    access-token-exp-seconds: 3600
+    refresh-token-exp-seconds: 1209600
 
 logging:
   level:
