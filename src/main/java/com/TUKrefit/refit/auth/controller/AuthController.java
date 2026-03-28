@@ -32,6 +32,7 @@ public class AuthController {
     )
     @PostMapping("/signup")
     public ResponseEntity<Void> signup(@Valid @RequestBody SignupRequest req) {
+        // 회원 기본 정보(users) 생성
         authService.signup(req);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
@@ -52,6 +53,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequest req,
             HttpServletRequest httpReq
     ) {
+        // 요청 IP/디바이스 정보를 함께 기록
         return ResponseEntity.ok(authService.login(req, httpReq));
     }
 
@@ -68,6 +70,7 @@ public class AuthController {
     )
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody TokenRefreshRequest req) {
+        // refresh 토큰 검증 후 access/refresh 재발급
         return ResponseEntity.ok(authService.refresh(req));
     }
 
@@ -86,6 +89,7 @@ public class AuthController {
     public ResponseEntity<LogoutResponse> logout(
             @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        // access 즉시 무효화 + refresh 폐기 + auth_log 종료 시각 기록
         return ResponseEntity.ok(authService.logout(authHeader));
     }
 }

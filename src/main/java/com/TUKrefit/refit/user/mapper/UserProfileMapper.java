@@ -1,10 +1,10 @@
 package com.TUKrefit.refit.user.mapper;
 
-import com.TUKrefit.refit.auth.entity.User;
-import com.TUKrefit.refit.auth.entity.UserProfile;
 import com.TUKrefit.refit.common.util.TimeUtil;
 import com.TUKrefit.refit.user.dto.UserProfileResponse;
 import com.TUKrefit.refit.user.dto.UserProfileUpsertRequest;
+import com.TUKrefit.refit.user.entity.User;
+import com.TUKrefit.refit.user.entity.UserProfile;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -70,6 +70,7 @@ public class UserProfileMapper {
             if (tags == null) return "[]";
             return OM.writeValueAsString(tags);
         } catch (Exception e) {
+            // 비정상 데이터는 빈 배열로 저장
             return "[]";
         }
     }
@@ -79,6 +80,7 @@ public class UserProfileMapper {
             if (json == null || json.isBlank()) return Collections.emptyList();
             return OM.readValue(json, new TypeReference<List<String>>() {});
         } catch (Exception e) {
+            // 파싱 실패 시 응답은 빈 배열로 고정
             return Collections.emptyList();
         }
     }

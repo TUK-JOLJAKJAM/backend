@@ -1,16 +1,17 @@
 package com.TUKrefit.refit.auth.service;
 
 import com.TUKrefit.refit.auth.dto.*;
-import com.TUKrefit.refit.auth.entity.*;
+import com.TUKrefit.refit.auth.entity.AuthLog;
 import com.TUKrefit.refit.auth.exception.AuthErrorCode;
 import com.TUKrefit.refit.auth.exception.AuthException;
 import com.TUKrefit.refit.auth.mapper.UserMapper;
 import com.TUKrefit.refit.auth.repository.AuthLogRepository;
-import com.TUKrefit.refit.auth.repository.UserRepository;
 import com.TUKrefit.refit.auth.security.JwtProvider;
 import com.TUKrefit.refit.auth.security.RefreshTokenService;
 import com.TUKrefit.refit.auth.security.TokenBlacklistService;
 import com.TUKrefit.refit.common.util.TimeUtil;
+import com.TUKrefit.refit.user.entity.User;
+import com.TUKrefit.refit.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,11 +37,13 @@ public class AuthService {
 
     @Transactional
     public void signup(SignupRequest req) {
+        // 이메일은 공백/대소문자를 정규화해서 중복 검사를 일관되게 수행
         String email = req.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(email)) {
             throw new AuthException(AuthErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
+        // 비밀번호 평문 저장 금지
         String pwHash = passwordEncoder.encode(req.getPassword());
         User user = UserMapper.toNewUser(req, pwHash);
         userRepository.save(user);
@@ -48,6 +51,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest req, HttpServletRequest httpReq) {
+        // 존재 여부와 비밀번호 검증 모두 동일 에러 코드로 응답해 계정 유추를 줄임
         User user = userRepository.findByEmail(req.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_CREDENTIALS));
 
@@ -58,6 +62,7 @@ public class AuthService {
         long now = TimeUtil.nowMs();
         String authId = UUID.randomUUID().toString();
 
+        // 로그인 세션을 auth_log에 남겨 추후 로그아웃 시각과 연결
         AuthLog log = AuthLog.builder()
                 .authId(authId)
                 .userId(user.getUserId())
@@ -70,6 +75,7 @@ public class AuthService {
 
         authLogRepository.save(log);
 
+        // Access/Refresh를 동시에 발급하고 만료 시각을 응답에 포함
         String accessToken = jwtProvider.createAccessToken(user.getUserId(), authId, now);
         long accessExpMs = jwtProvider.getExpMs(accessToken);
 
@@ -95,6 +101,7 @@ public class AuthService {
         String refreshToken = req.getRefreshToken();
 
         try {
+            // refresh 타입 토큰만 재발급 허용
             if (!jwtProvider.isRefreshToken(refreshToken)) {
                 throw new AuthException(AuthErrorCode.REFRESH_TOKEN_INVALID);
             }
@@ -110,7 +117,7 @@ public class AuthService {
 
             long now = TimeUtil.nowMs();
 
-            // 새 토큰 발급(회전)
+            // 재사용 공격 방지를 위해 refresh 토큰은 매번 회전
             String newAccess = jwtProvider.createAccessToken(userId, authId, now);
             long newAccessExpMs = jwtProvider.getExpMs(newAccess);
 
@@ -138,6 +145,7 @@ public class AuthService {
 
     @Transactional
     public LogoutResponse logout(String bearerToken) {
+        // Authorization 헤더 형식 검사
         if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
             throw new AuthException(AuthErrorCode.UNAUTHORIZED);
         }
@@ -173,6 +181,7 @@ public class AuthService {
     }
 
     private String extractIp(HttpServletRequest req) {
+        // 프록시 환경에서는 X-Forwarded-For의 첫 IP를 우선 사용
         String xff = req.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) return xff.split(",")[0].trim();
         return req.getRemoteAddr();

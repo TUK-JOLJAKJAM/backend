@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class TokenBlacklistService {
 
+    // key: jwt:blacklist:{jti}
     private static final String PREFIX = "jwt:blacklist:";
 
     private final StringRedisTemplate redisTemplate;

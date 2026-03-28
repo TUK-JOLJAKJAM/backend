@@ -29,6 +29,7 @@ public class UserProfileController {
     )
     @GetMapping("/exists")
     public ResponseEntity<UserProfileExistsResponse> exists() {
+        // access token의 subject(userId) 기준 조회
         return ResponseEntity.ok(userProfileService.exists(currentUserId()));
     }
 
@@ -45,6 +46,7 @@ public class UserProfileController {
     )
     @GetMapping
     public ResponseEntity<UserProfileResponse> get() {
+        // 내 프로필 단건 조회
         return ResponseEntity.ok(userProfileService.get(currentUserId()));
     }
 
@@ -61,11 +63,13 @@ public class UserProfileController {
     )
     @PutMapping
     public ResponseEntity<UserProfileResponse> upsert(@Valid @RequestBody UserProfileUpsertRequest req) {
+        // 없으면 생성, 있으면 전체 갱신
         return ResponseEntity.ok(userProfileService.upsert(currentUserId(), req));
     }
 
     private String currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        // JwtAuthenticationFilter에서 principal로 넣은 userId 사용
         if (auth == null || auth.getPrincipal() == null) return null;
         return auth.getPrincipal().toString();
     }

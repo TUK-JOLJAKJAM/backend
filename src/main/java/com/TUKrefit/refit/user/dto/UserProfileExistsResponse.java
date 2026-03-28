@@ -8,5 +8,5 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class UserProfileExistsResponse {
-    private boolean exists;
+    private boolean exists; // user_profile 존재 여부
 }

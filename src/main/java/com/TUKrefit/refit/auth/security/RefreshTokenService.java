@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
+    // key: jwt:refresh:user:{userId}
     private static final String PREFIX = "jwt:refresh:user:";
 
     private final StringRedisTemplate redisTemplate;

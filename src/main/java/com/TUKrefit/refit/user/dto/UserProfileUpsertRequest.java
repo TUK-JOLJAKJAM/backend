@@ -14,18 +14,18 @@ import java.util.List;
 @Builder
 public class UserProfileUpsertRequest {
 
-    private Float heightCm;
-    private Float weightKg;
+    private Float heightCm; // 키(cm)
+    private Float weightKg; // 몸무게(kg)
 
     // "L" 또는 "R"
     @Size(min = 1, max = 1)
     private String dominantHand;
 
-    private List<String> diagnosisTags;
+    private List<String> diagnosisTags; // 예: ["stroke","knee_oa"]
 
     @Min(0) @Max(10)
     private Integer painBaseline0to10;
 
     @Size(max = 500)
-    private String notes;
+    private String notes; // 메모
 }

@@ -24,6 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletRequest request, HttpServletResponse response, FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // Bearer 헤더가 없으면 익명 요청으로 통과
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -47,6 +48,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // principal에 userId를 넣고 SecurityContext에 저장
             var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of());
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(auth);

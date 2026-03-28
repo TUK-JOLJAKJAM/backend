@@ -11,5 +11,5 @@ import lombok.*;
 public class TokenRefreshRequest {
 
     @NotBlank
-    private String refreshToken;
+    private String refreshToken; // 로그인/재발급에서 받은 refresh token
 }
