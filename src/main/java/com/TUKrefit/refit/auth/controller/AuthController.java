@@ -5,6 +5,7 @@ import com.TUKrefit.refit.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.*;
 import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -86,6 +87,7 @@ public class AuthController {
             content = @Content(schema = @Schema(implementation = java.util.Map.class))
     )
     @PostMapping("/logout")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<LogoutResponse> logout(
             @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {

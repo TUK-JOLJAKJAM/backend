@@ -5,6 +5,7 @@ import com.TUKrefit.refit.user.service.UserProfileService;
 import io.swagger.v3.oas.annotations.*;
 import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/users/me/profile")
 @RequiredArgsConstructor
 @Tag(name = "UserProfile", description = "내 프로필(UserProfile) 관리")
+@SecurityRequirement(name = "bearerAuth")
 public class UserProfileController {
 
     private final UserProfileService userProfileService;
