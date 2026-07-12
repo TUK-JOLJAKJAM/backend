@@ -11,7 +11,9 @@ import com.TUKrefit.refit.user.entity.UserProfile;
 import com.TUKrefit.refit.user.mapper.UserProfileMapper;
 import com.TUKrefit.refit.user.repository.UserProfileRepository;
 import com.TUKrefit.refit.user.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,10 +76,14 @@ public class UserProfileService {
     }
 
     private User getUserReference(String userId) {
-        if (!userRepository.existsById(userId)) {
+        try {
+            User user = userRepository.getReferenceById(userId);
+            // 프록시가 실제 사용자 행을 조회하도록 필드 접근
+            user.getEmail();
+            return user;
+        } catch (EntityNotFoundException | EmptyResultDataAccessException e) {
             throw new AuthException(AuthErrorCode.UNAUTHORIZED);
         }
-        return userRepository.getReferenceById(userId);
     }
 
     private void validate(UserProfileUpsertRequest req) {
