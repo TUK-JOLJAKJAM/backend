@@ -12,6 +12,7 @@ import com.TUKrefit.refit.user.mapper.UserProfileMapper;
 import com.TUKrefit.refit.user.repository.UserProfileRepository;
 import com.TUKrefit.refit.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class UserProfileService {
 
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public UserProfileExistsResponse exists(String userId) {
@@ -58,7 +60,8 @@ public class UserProfileService {
                 })
                 .orElseGet(() -> {
                     UserProfile created = UserProfileMapper.toNew(user, req);
-                    userProfileRepository.save(created);
+                    // @MapsId 신규 엔티티는 merge가 아닌 persist로 식별자를 확정
+                    entityManager.persist(created);
                     return UserProfileMapper.toResponse(created);
                 });
     }
@@ -72,7 +75,9 @@ public class UserProfileService {
                 .diagnosisTags("[]")
                 .updatedAtMs(TimeUtil.nowMs())
                 .build();
-        return userProfileRepository.save(profile);
+        // @MapsId 신규 엔티티는 merge가 아닌 persist로 식별자를 확정
+        entityManager.persist(profile);
+        return profile;
     }
 
     private User getUserReference(String userId) {
