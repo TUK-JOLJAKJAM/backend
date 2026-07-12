@@ -82,8 +82,8 @@ public class AuthService {
         String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), authId, now);
         long refreshExpMs = jwtProvider.getExpMs(refreshToken);
 
-        // 사용자당 1개 refresh만 유지(최소 구현)
-        refreshTokenService.save(user.getUserId(), jwtProvider.getJti(refreshToken), refreshExpMs - now);
+        // 로그인 세션별로 refresh JTI를 저장해 다중 기기 로그인을 지원
+        refreshTokenService.save(authId, jwtProvider.getJti(refreshToken), refreshExpMs - now);
 
         return AuthResponse.builder()
                 .userId(user.getUserId())
@@ -110,8 +110,8 @@ public class AuthService {
             String authId = jwtProvider.getAuthId(refreshToken);
             String refreshJti = jwtProvider.getJti(refreshToken);
 
-            // Redis에 저장된 jti와 일치해야 유효(회전/폐기 대응)
-            if (!refreshTokenService.matches(userId, refreshJti)) {
+            // 삭제된 사용자 토큰은 재발급하지 않음
+            if (!userRepository.existsById(userId)) {
                 throw new AuthException(AuthErrorCode.REFRESH_TOKEN_INVALID);
             }
 
@@ -124,7 +124,16 @@ public class AuthService {
             String newRefresh = jwtProvider.createRefreshToken(userId, authId, now);
             long newRefreshExpMs = jwtProvider.getExpMs(newRefresh);
 
-            refreshTokenService.save(userId, jwtProvider.getJti(newRefresh), newRefreshExpMs - now);
+            // 기존 JTI 검증과 새 JTI 저장을 원자적으로 수행
+            boolean rotated = refreshTokenService.rotate(
+                    authId,
+                    refreshJti,
+                    jwtProvider.getJti(newRefresh),
+                    newRefreshExpMs - now
+            );
+            if (!rotated) {
+                throw new AuthException(AuthErrorCode.REFRESH_TOKEN_INVALID);
+            }
 
             return AuthResponse.builder()
                     .userId(userId)
@@ -163,12 +172,11 @@ public class AuthService {
         long expMs = jwtProvider.getExpMs(accessToken);
         tokenBlacklistService.blacklist(accessJti, expMs - now);
 
-        // Refresh 폐기(사용자 기준)
-        String userId = jwtProvider.getUserId(accessToken);
-        refreshTokenService.delete(userId);
+        // 로그인 세션 기준으로 Refresh 폐기
+        String authId = jwtProvider.getAuthId(accessToken);
+        refreshTokenService.delete(authId);
 
         // auth_log는 로그 기록
-        String authId = jwtProvider.getAuthId(accessToken);
         if (authId != null) {
             authLogRepository.findByAuthIdAndLogoutAtMsIsNull(authId)
                     .ifPresent(log -> log.setLogoutAtMs(now));

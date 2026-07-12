@@ -78,7 +78,8 @@ public class GameHistoryController {
 
     private String currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getPrincipal() == null) return null;
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) return null;
+        if ("anonymousUser".equals(auth.getPrincipal())) return null;
         return auth.getPrincipal().toString();
     }
 }

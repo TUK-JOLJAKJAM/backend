@@ -35,7 +35,7 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.exists(currentUserId()));
     }
 
-    @Operation(summary = "프로필 조회", description = "내 UserProfile 조회(없으면 404)")
+    @Operation(summary = "프로필 조회", description = "내 UserProfile 조회(없으면 빈 프로필 생성)")
     @ApiResponse(
             responseCode = "200",
             description = "OK",
@@ -72,7 +72,8 @@ public class UserProfileController {
     private String currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         // JwtAuthenticationFilter에서 principal로 넣은 userId 사용
-        if (auth == null || auth.getPrincipal() == null) return null;
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) return null;
+        if ("anonymousUser".equals(auth.getPrincipal())) return null;
         return auth.getPrincipal().toString();
     }
 }

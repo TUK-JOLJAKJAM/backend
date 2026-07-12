@@ -2,6 +2,7 @@ package com.TUKrefit.refit.user.service;
 
 import com.TUKrefit.refit.auth.exception.AuthErrorCode;
 import com.TUKrefit.refit.auth.exception.AuthException;
+import com.TUKrefit.refit.common.util.TimeUtil;
 import com.TUKrefit.refit.user.dto.UserProfileExistsResponse;
 import com.TUKrefit.refit.user.dto.UserProfileResponse;
 import com.TUKrefit.refit.user.dto.UserProfileUpsertRequest;
@@ -23,21 +24,24 @@ public class UserProfileService {
 
     @Transactional(readOnly = true)
     public UserProfileExistsResponse exists(String userId) {
+        requireUser(userId);
         // user_profile 존재 여부만 빠르게 확인
         return UserProfileExistsResponse.builder()
                 .exists(userProfileRepository.existsById(userId))
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public UserProfileResponse get(String userId) {
-        UserProfile profile = userProfileRepository.findById(userId)
-                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_PROFILE_NOT_FOUND));
-        return UserProfileMapper.toResponse(profile);
+        requireUser(userId);
+        return userProfileRepository.findById(userId)
+                .map(UserProfileMapper::toResponse)
+                .orElseGet(() -> UserProfileMapper.toResponse(createEmptyProfile(userId)));
     }
 
     @Transactional
     public UserProfileResponse upsert(String userId, UserProfileUpsertRequest req) {
+        requireUser(userId);
         // 요청값 범위를 먼저 검증
         validate(req);
 
@@ -58,6 +62,19 @@ public class UserProfileService {
                 });
     }
 
+    private UserProfile createEmptyProfile(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthException(AuthErrorCode.UNAUTHORIZED));
+
+        UserProfile profile = UserProfile.builder()
+                .userId(userId)
+                .user(user)
+                .diagnosisTags("[]")
+                .updatedAtMs(TimeUtil.nowMs())
+                .build();
+        return userProfileRepository.save(profile);
+    }
+
     private void validate(UserProfileUpsertRequest req) {
         // 우세손은 L/R만 허용
         if (req.getDominantHand() != null && !req.getDominantHand().isBlank()) {
@@ -70,6 +87,12 @@ public class UserProfileService {
         if (req.getPainBaseline0to10() != null) {
             int v = req.getPainBaseline0to10();
             if (v < 0 || v > 10) throw new AuthException(AuthErrorCode.INVALID_USER_PROFILE);
+        }
+    }
+
+    private void requireUser(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new AuthException(AuthErrorCode.UNAUTHORIZED);
         }
     }
 }
