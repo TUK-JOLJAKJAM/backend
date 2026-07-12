@@ -46,8 +46,7 @@ public class UserProfileService {
         validate(req);
 
         // 인증 사용자 검증
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AuthException(AuthErrorCode.UNAUTHORIZED));
+        User user = getUserReference(userId);
 
         // 있으면 수정, 없으면 생성(upsert)
         return userProfileRepository.findById(userId)
@@ -63,8 +62,7 @@ public class UserProfileService {
     }
 
     private UserProfile createEmptyProfile(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AuthException(AuthErrorCode.UNAUTHORIZED));
+        User user = getUserReference(userId);
 
         UserProfile profile = UserProfile.builder()
                 .userId(userId)
@@ -73,6 +71,13 @@ public class UserProfileService {
                 .updatedAtMs(TimeUtil.nowMs())
                 .build();
         return userProfileRepository.save(profile);
+    }
+
+    private User getUserReference(String userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new AuthException(AuthErrorCode.UNAUTHORIZED);
+        }
+        return userRepository.getReferenceById(userId);
     }
 
     private void validate(UserProfileUpsertRequest req) {
