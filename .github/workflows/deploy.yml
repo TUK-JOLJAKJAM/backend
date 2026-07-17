@@ -262,6 +262,18 @@ jobs:
             docker exec refit-ai python -c \
               "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
 
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent --output /dev/null http://127.0.0.1/v3/api-docs; then
+                echo "Spring API ready attempt=$attempt"
+                break
+              fi
+              if [ "$attempt" -eq 60 ]; then
+                echo "Spring API가 120초 안에 준비되지 않았습니다."
+                exit 1
+              fi
+              sleep 2
+            done
+
             curl --fail --silent --show-error http://127.0.0.1/ | \
               grep --quiet '<title>ReFit Analysis</title>'
             curl --fail --silent --show-error http://127.0.0.1/v3/api-docs > /dev/null
