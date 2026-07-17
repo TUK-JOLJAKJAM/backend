@@ -23,7 +23,8 @@
 
 ## 설정
 
-- `AI_BASE_URL`: 내부 AI 서버 주소, Compose 기본값 `http://ai:8000`
+- `AI_BASE_URL`: 내부 AI 서버 주소. 운영 Compose 기본값은 배포 스모크 테스트와
+  동일한 Caddy 경로 `http://proxy/ai`이며, Caddy가 이를 Uvicorn `ai:8000`으로 전달합니다.
 - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`: MySQL 연결
 - `REDIS_HOST`, `REDIS_PORT`: 토큰 저장 Redis
 - `JWT_SECRET`: JWT 서명 키

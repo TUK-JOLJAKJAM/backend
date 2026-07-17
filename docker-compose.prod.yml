@@ -28,7 +28,9 @@ services:
       REDIS_PORT: 6379
 
       JWT_SECRET: ${JWT_SECRET}
-      AI_BASE_URL: http://ai:8000
+      # Spring uses the same internal Caddy route that is exercised by the
+      # deployment smoke test. Caddy strips /ai and proxies to Uvicorn.
+      AI_BASE_URL: ${AI_BASE_URL:-http://proxy/ai}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://43.200.20.216,http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       - mysql
