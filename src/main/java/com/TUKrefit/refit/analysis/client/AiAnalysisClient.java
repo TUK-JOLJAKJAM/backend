@@ -26,6 +26,9 @@ public class AiAnalysisClient {
         this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
+                // Uvicorn exposes HTTP/1.1. Avoid an h2c upgrade attempt on the
+                // direct Docker-network connection.
+                .version(HttpClient.Version.HTTP_1_1)
                 .build();
         String normalized = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.analyzeUri = URI.create(normalized + "/api/v1/analyze_session");
@@ -35,7 +38,9 @@ public class AiAnalysisClient {
         try {
             HttpRequest request = HttpRequest.newBuilder(analyzeUri)
                     .timeout(Duration.ofSeconds(20))
+                    .version(HttpClient.Version.HTTP_1_1)
                     .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
