@@ -2,6 +2,7 @@ package com.TUKrefit.refit.game.service;
 
 import com.TUKrefit.refit.auth.exception.AuthErrorCode;
 import com.TUKrefit.refit.auth.exception.AuthException;
+import com.TUKrefit.refit.common.util.TimeUtil;
 import com.TUKrefit.refit.game.dto.*;
 import com.TUKrefit.refit.game.entity.GameHistory;
 import com.TUKrefit.refit.game.exception.GameHistoryErrorCode;
@@ -22,6 +23,7 @@ public class GameHistoryService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final long MAX_SESSION_DURATION_MS = 24L * 60L * 60L * 1000L;
 
     private final GameHistoryRepository gameHistoryRepository;
 
@@ -83,8 +85,16 @@ public class GameHistoryService {
     }
 
     private void validateCreateRequest(GameHistoryCreateRequest req) {
-        if (req.getEndedAtMs() < req.getStartedAtMs()) {
+        long startedAtMs = TimeUtil.normalizeGameTimestamp(req.getStartedAtMs());
+        long endedAtMs = TimeUtil.normalizeGameTimestamp(req.getEndedAtMs());
+        if (!TimeUtil.isReasonableEpochMs(startedAtMs) || !TimeUtil.isReasonableEpochMs(endedAtMs)) {
+            throw new GameHistoryException(GameHistoryErrorCode.INVALID_GAME_HISTORY, "게임 시각은 epoch ms 또는 Unity 구버전 yyyyMMddHHmmssff 형식이어야 합니다.");
+        }
+        if (endedAtMs < startedAtMs) {
             throw new GameHistoryException(GameHistoryErrorCode.INVALID_GAME_HISTORY, "endedAtMs는 startedAtMs보다 작을 수 없습니다.");
+        }
+        if (endedAtMs - startedAtMs > MAX_SESSION_DURATION_MS) {
+            throw new GameHistoryException(GameHistoryErrorCode.INVALID_GAME_HISTORY, "게임 세션은 24시간을 초과할 수 없습니다.");
         }
 
         if (req.getActionCount() != null && req.getSuccessCount() != null && req.getSuccessCount() > req.getActionCount()) {
@@ -93,6 +103,16 @@ public class GameHistoryService {
 
         if (req.getActionCount() != null && req.getFailCount() != null && req.getFailCount() > req.getActionCount()) {
             throw new GameHistoryException(GameHistoryErrorCode.INVALID_GAME_HISTORY, "failCount는 actionCount를 초과할 수 없습니다.");
+        }
+
+        if (req.getActionCount() != null && req.getSuccessCount() != null && req.getFailCount() != null
+                && req.getSuccessCount() + req.getFailCount() != req.getActionCount()) {
+            throw new GameHistoryException(GameHistoryErrorCode.INVALID_GAME_HISTORY, "successCount와 failCount의 합은 actionCount와 같아야 합니다.");
+        }
+
+        if (req.getActionCount() != null && req.getGameData() != null && !req.getGameData().isEmpty()
+                && req.getGameData().size() != req.getActionCount()) {
+            throw new GameHistoryException(GameHistoryErrorCode.INVALID_GAME_HISTORY, "gameData 개수는 actionCount와 같아야 합니다.");
         }
     }
 

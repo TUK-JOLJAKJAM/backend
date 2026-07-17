@@ -24,6 +24,9 @@ public class GameHistory {
     @Column(name = "user_id", length = 36, nullable = false)
     private String userId; // 소유 사용자 ID
 
+    @Column(name = "schema_version", length = 20)
+    private String schemaVersion; // Unity-Spring 데이터 계약 버전
+
     @Column(name = "game_id", length = 100, nullable = false)
     private String gameId; // 예: Game_Shoulder_FireWood
 
