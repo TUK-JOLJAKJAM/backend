@@ -14,18 +14,25 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: 백엔드 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: AI 서버 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: TUK-JOLJAKJAM/refit-ai-server
           ref: main
           path: refit-ai-server
+
+      - name: 프론트엔드 체크아웃
+        uses: actions/checkout@v5
+        with:
+          repository: TUK-JOLJAKJAM/front-end
+          ref: main
+          path: front-end
 
       - name: Python 설정
         uses: actions/setup-python@v5
@@ -34,11 +41,32 @@ jobs:
           cache: pip
           cache-dependency-path: refit-ai-server/requirements.txt
 
+      - name: Node.js 설정
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: front-end/package-lock.json
+
       - name: AI 전체 테스트
         working-directory: refit-ai-server
         run: |
           python -m pip install -r requirements.txt
           python -m pytest -q
+
+      - name: React 테스트와 HTTP 데모 빌드
+        working-directory: front-end
+        env:
+          CI: "true"
+          PUBLIC_URL: http://localhost:18080
+          REACT_APP_AI_API_URL: http://localhost:18080/ai
+          REACT_APP_BACKEND_API_URL: http://localhost:18080
+        run: |
+          npm ci
+          npm test -- --watchAll=false
+          npm run build
+          grep --recursive --quiet 'HTTP 데모 모드' build/static/js
+          grep --recursive --quiet 'http://localhost:18080/ai' build/static/js
 
       - name: Compose 설정 검증
         env:
@@ -56,16 +84,17 @@ jobs:
       - name: AI 이미지 빌드
         run: docker build --tag refit-ai-server:ci ./refit-ai-server
 
-      - name: AI와 Caddy 실제 라우팅 검증
+      - name: React와 Spring·AI 실제 라우팅 검증
         run: |
           set -euo pipefail
 
           cleanup() {
-            docker rm --force refit-ci-caddy refit-ci-ai > /dev/null 2>&1 || true
+            docker rm --force refit-ci-caddy refit-ci-ai refit-ci-app > /dev/null 2>&1 || true
             docker network rm refit-ci > /dev/null 2>&1 || true
           }
 
           diagnostics() {
+            docker logs refit-ci-app || true
             docker logs refit-ci-ai || true
             docker logs refit-ci-caddy || true
           }
@@ -75,12 +104,15 @@ jobs:
           cleanup
 
           docker network create refit-ci
+          docker run --detach --network refit-ci --name refit-ci-app \
+            --network-alias app python:3.12-alpine sh -c \
+            "mkdir -p /srv/api && printf 'spring-mock' > /srv/api/ping && cd /srv && python -m http.server 8080"
           docker run --detach --network refit-ci --name refit-ci-ai \
             --network-alias ai refit-ai-server:ci
           docker run --detach --network refit-ci --name refit-ci-caddy \
-            --env PUBLIC_HOST=http://localhost \
             --publish 18080:80 \
             --volume "${GITHUB_WORKSPACE}/caddy:/etc/caddy:ro" \
+            --volume "${GITHUB_WORKSPACE}/front-end/build:/srv:ro" \
             caddy:2.11.4-alpine
 
           for attempt in $(seq 1 30); do
@@ -88,17 +120,21 @@ jobs:
               break
             fi
             if [ "$attempt" -eq 30 ]; then
-              echo "AI 프록시 health check가 60초 안에 성공하지 않았습니다."
-              curl --silent --show-error --include http://localhost:18080/ai/health || true
+              echo "HTTP 데모 프록시가 60초 안에 준비되지 않았습니다."
               diagnostics
               exit 1
             fi
             sleep 2
           done
 
+          curl --fail --silent --show-error http://localhost:18080/ | \
+            grep --quiet '<title>ReFit Analysis</title>'
+          curl --fail --silent --show-error http://localhost:18080/api/ping | \
+            grep --quiet 'spring-mock'
+
           analysis_response="$(curl --fail --silent --show-error \
             --request POST \
             --header 'Content-Type: application/json' \
-            --data '{"history_id":"pull-request-integration-smoke"}' \
+            --data '{"history_id":"pull-request-http-demo"}' \
             http://localhost:18080/ai/api/v1/analyze_session)"
-          printf '%s' "$analysis_response" | grep --quiet '"history_id":"pull-request-integration-smoke"'
+          printf '%s' "$analysis_response" | grep --quiet '"history_id":"pull-request-http-demo"'

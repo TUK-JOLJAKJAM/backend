@@ -2,18 +2,11 @@ services:
   proxy:
     image: caddy:2.11.4-alpine
     container_name: refit-caddy
-    environment:
-      PUBLIC_HOST: ${PUBLIC_HOST:-43.200.20.216.sslip.io}
-    cap_add:
-      - NET_ADMIN
     ports:
       - "80:80"
-      - "443:443"
-      - "443:443/udp"
     volumes:
       - ./caddy:/etc/caddy:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - ./frontend:/srv:ro
     depends_on:
       - app
       - ai
@@ -35,7 +28,7 @@ services:
       REDIS_PORT: 6379
 
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,https://tuk-joljakjam.github.io}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://43.200.20.216,http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       - mysql
       - redis
@@ -48,7 +41,7 @@ services:
     container_name: refit-ai
     environment:
       PORT: 8000
-      CORS_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,https://tuk-joljakjam.github.io}
+      CORS_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://43.200.20.216,http://localhost:3000,http://127.0.0.1:3000}
       REFIT_LOG_RAW_DATA: "false"
     healthcheck:
       test:
@@ -95,8 +88,6 @@ services:
 volumes:
   mysql_data:
   redis_data:
-  caddy_data:
-  caddy_config:
 
 networks:
   refit-net:
