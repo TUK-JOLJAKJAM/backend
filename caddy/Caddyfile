@@ -1,4 +1,4 @@
-{$PUBLIC_HOST} {
+:80 {
     encode zstd gzip
 
     log {
@@ -7,7 +7,6 @@
     }
 
     header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"
@@ -21,7 +20,14 @@
         reverse_proxy ai:8000
     }
 
-    handle {
+    @spring path /api /api/* /v3/api-docs* /swagger /swagger/* /swagger-ui/* /actuator/*
+    handle @spring {
         reverse_proxy app:8080
+    }
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
     }
 }
