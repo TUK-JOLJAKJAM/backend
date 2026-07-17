@@ -84,6 +84,48 @@ jobs:
             ${{ env.AI_IMAGE_NAME }}:${{ env.AI_COMMIT_SHA }}
             ${{ env.AI_IMAGE_NAME }}:latest
 
+      - name: AI 이미지와 Nginx 통합 테스트
+        run: |
+          set -euo pipefail
+
+          cleanup() {
+            docker rm --force refit-ci-nginx refit-ci-ai > /dev/null 2>&1 || true
+            docker network rm refit-ci > /dev/null 2>&1 || true
+          }
+
+          diagnostics() {
+            docker logs refit-ci-ai || true
+            docker logs refit-ci-nginx || true
+          }
+
+          trap diagnostics ERR
+          trap cleanup EXIT
+          cleanup
+
+          docker pull "${AI_IMAGE_NAME}:${AI_COMMIT_SHA}"
+          docker network create refit-ci
+          docker run --detach --network refit-ci --name refit-ci-ai \
+            --network-alias ai "${AI_IMAGE_NAME}:${AI_COMMIT_SHA}"
+          docker run --detach --network refit-ci --name refit-ci-nginx \
+            --publish 18080:80 \
+            --volume "${GITHUB_WORKSPACE}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.27-alpine
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/ai/health > /dev/null; then
+              break
+            fi
+            [ "$attempt" -lt 30 ] || exit 1
+            sleep 2
+          done
+
+          analysis_response="$(curl --fail --silent --show-error \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data '{"history_id":"image-integration-smoke"}' \
+            http://127.0.0.1:18080/ai/api/v1/analyze_session)"
+          printf '%s' "$analysis_response" | grep --quiet '"history_id":"image-integration-smoke"'
+
       - name: SSH 키 설정
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -114,7 +156,7 @@ jobs:
         run: |
           scp -o StrictHostKeyChecking=no .env ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:~/refit/.env
 
-      - name: 서버에서 compose 재기동
+      - name: 서버에서 서비스 갱신
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} 'bash -se' <<'REMOTE'
             set -euo pipefail
@@ -155,37 +197,48 @@ jobs:
               sleep 5
             done
 
-            echo "Nginx 설정 검증 및 재시작"
+            echo "Nginx 설정 문법 검증"
             compose exec -T nginx nginx -t
-            compose restart nginx
 
-            echo "AI 서버 준비 상태 확인"
-            for attempt in $(seq 1 30); do
-              if curl --fail --silent --show-error http://127.0.0.1/ai/health; then
-                echo
-                echo "AI 서버 배포 확인 완료"
-                break
-              fi
+            trap - ERR
+            docker image prune -f
+          REMOTE
 
-              if [ "$attempt" -eq 30 ]; then
-                exit 1
-              fi
+      - name: Nginx 컨테이너 강제 재생성
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} \
+            "cd ~/refit && docker compose --env-file .env -f docker-compose.prod.yml up -d --force-recreate --no-deps nginx"
 
-              sleep 5
-            done
+      - name: 원격 컨테이너와 내부 연결 검증
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} 'bash -se' <<'REMOTE'
+            set -euo pipefail
+            cd ~/refit
 
-            echo "백엔드와 AI 분석 연결 스모크 테스트"
+            compose() {
+              docker compose --env-file .env -f docker-compose.prod.yml "$@"
+            }
+
+            diagnostics() {
+              compose ps || true
+              compose logs --tail=120 ai nginx || true
+            }
+            trap diagnostics ERR
+
+            compose ps
+            docker exec refit-nginx nginx -T 2>&1 | grep --fixed-strings 'set $ai_upstream ai:8000;'
+            docker exec refit-nginx wget --quiet --output-document=- http://ai:8000/health > /dev/null
+
             curl --fail --silent --show-error http://127.0.0.1/v3/api-docs > /dev/null
+            curl --fail --silent --show-error http://127.0.0.1/ai/health > /dev/null
             analysis_response="$(curl --fail --silent --show-error \
               --request POST \
               --header 'Content-Type: application/json' \
               --data '{"history_id":"deployment-smoke"}' \
               http://127.0.0.1/ai/api/v1/analyze_session)"
             printf '%s' "$analysis_response" | grep --quiet '"history_id":"deployment-smoke"'
-            echo "백엔드와 AI 분석 스모크 테스트 완료"
 
             trap - ERR
-            docker image prune -f
           REMOTE
 
       - name: 외부 공개 API 스모크 테스트

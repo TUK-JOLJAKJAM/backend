@@ -1,0 +1,98 @@
+name: verify-deployment
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "docker-compose.prod.yml"
+      - "nginx/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 백엔드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AI 서버 체크아웃
+        uses: actions/checkout@v4
+        with:
+          repository: TUK-JOLJAKJAM/refit-ai-server
+          ref: main
+          path: refit-ai-server
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: refit-ai-server/requirements.txt
+
+      - name: AI 전체 테스트
+        working-directory: refit-ai-server
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pytest -q
+
+      - name: Compose 설정 검증
+        env:
+          GHCR_OWNER: test-owner
+          GHCR_REPO: backend
+          APP_IMAGE_TAG: test
+          AI_IMAGE_TAG: test
+          JWT_SECRET: test-jwt-secret-at-least-32-characters
+          MYSQL_DATABASE: refit
+          MYSQL_USER: refit
+          MYSQL_PASSWORD: test-password
+          MYSQL_ROOT_PASSWORD: test-root-password
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
+      - name: AI 이미지 빌드
+        run: docker build --tag refit-ai-server:ci ./refit-ai-server
+
+      - name: AI와 Nginx 실제 라우팅 검증
+        run: |
+          set -euo pipefail
+
+          cleanup() {
+            docker rm --force refit-ci-nginx refit-ci-ai > /dev/null 2>&1 || true
+            docker network rm refit-ci > /dev/null 2>&1 || true
+          }
+
+          diagnostics() {
+            docker logs refit-ci-ai || true
+            docker logs refit-ci-nginx || true
+          }
+
+          trap diagnostics ERR
+          trap cleanup EXIT
+          cleanup
+
+          docker network create refit-ci
+          docker run --detach --network refit-ci --name refit-ci-ai \
+            --network-alias ai refit-ai-server:ci
+          docker run --detach --network refit-ci --name refit-ci-nginx \
+            --publish 18080:80 \
+            --volume "${GITHUB_WORKSPACE}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.27-alpine
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/ai/health > /dev/null; then
+              break
+            fi
+            [ "$attempt" -lt 30 ] || exit 1
+            sleep 2
+          done
+
+          analysis_response="$(curl --fail --silent --show-error \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data '{"history_id":"pull-request-integration-smoke"}' \
+            http://127.0.0.1:18080/ai/api/v1/analyze_session)"
+          printf '%s' "$analysis_response" | grep --quiet '"history_id":"pull-request-integration-smoke"'
