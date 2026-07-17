@@ -11,6 +11,7 @@ import lombok.*;
 @Builder
 public class GameHistoryListItemResponse {
     private String historyId;
+    private String schemaVersion;
     private String gameId;
     private String gameName;
     private String gameVersion;

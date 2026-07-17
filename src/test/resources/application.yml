@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:refit;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  ai:
+    base-url: http://127.0.0.1:65535
+  cors:
+    allowed-origins: http://localhost:3000
+  jwt:
+    secret: test-jwt-secret-that-is-at-least-thirty-two-characters-long
+    access-token-exp-seconds: 3600
+    refresh-token-exp-seconds: 1209600

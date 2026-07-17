@@ -69,6 +69,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pytest -q
 
+      - name: Spring 전체 테스트
+        run: bash ./gradlew clean test
+
       - name: React 테스트와 HTTP 데모 빌드
         working-directory: front-end
         env:

@@ -15,6 +15,7 @@ import java.util.Map;
 public class GameHistoryDetailResponse {
     private String historyId;
     private String userId;
+    private String schemaVersion;
     private String gameId;
     private String gameName;
     private String gameVersion;

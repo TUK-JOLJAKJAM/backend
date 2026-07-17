@@ -16,6 +16,9 @@ import java.util.Map;
 @Builder
 public class GameHistoryCreateRequest {
 
+    @Size(max = 20)
+    private String schemaVersion; // Unity-Spring 데이터 계약 버전
+
     @NotBlank
     @Size(max = 100)
     private String gameId; // 예: Game_Shoulder_FireWood
@@ -43,16 +46,16 @@ public class GameHistoryCreateRequest {
     @PositiveOrZero
     private Long endedAtMs; // 종료 시각(epoch ms)
 
-    @Min(0)
+    @Min(0) @Max(1000000)
     private Integer score; // 점수(선택)
 
-    @Min(0)
+    @Min(0) @Max(5000)
     private Integer actionCount; // 수행 동작 수(선택)
 
-    @Min(0)
+    @Min(0) @Max(5000)
     private Integer successCount; // 성공 동작 수(선택)
 
-    @Min(0)
+    @Min(0) @Max(5000)
     private Integer failCount; // 실패 동작 수(선택)
 
     private Map<String, Object> sessionSummary; // 세션 요약

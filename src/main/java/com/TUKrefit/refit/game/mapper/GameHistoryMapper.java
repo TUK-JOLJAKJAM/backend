@@ -16,19 +16,22 @@ public class GameHistoryMapper {
 
     public static GameHistory toEntity(String userId, GameHistoryCreateRequest req) {
         long now = TimeUtil.nowMs();
-        long durationMs = req.getEndedAtMs() - req.getStartedAtMs();
+        long startedAtMs = TimeUtil.normalizeGameTimestamp(req.getStartedAtMs());
+        long endedAtMs = TimeUtil.normalizeGameTimestamp(req.getEndedAtMs());
+        long durationMs = Math.max(endedAtMs - startedAtMs, 0L);
 
         return GameHistory.builder()
                 .historyId(UUID.randomUUID().toString())
                 .userId(userId)
+                .schemaVersion(Optional.ofNullable(trimToNull(req.getSchemaVersion())).orElse("legacy-1.0"))
                 .gameId(req.getGameId().trim())
                 .gameName(trimToNull(req.getGameName()))
                 .gameVersion(trimToNull(req.getGameVersion()))
                 .primaryPart(req.getPrimaryPart())
                 .clientType(req.getClientType())
                 .deviceId(trimToNull(req.getDeviceId()))
-                .startedAtMs(req.getStartedAtMs())
-                .endedAtMs(req.getEndedAtMs())
+                .startedAtMs(startedAtMs)
+                .endedAtMs(endedAtMs)
                 .durationMs(durationMs)
                 .score(req.getScore())
                 .actionCount(req.getActionCount())
@@ -45,6 +48,7 @@ public class GameHistoryMapper {
     public static GameHistoryCreateResponse toCreateResponse(GameHistory entity) {
         return GameHistoryCreateResponse.builder()
                 .historyId(entity.getHistoryId())
+                .schemaVersion(entity.getSchemaVersion())
                 .createdAtMs(entity.getCreatedAtMs())
                 .build();
     }
@@ -52,6 +56,7 @@ public class GameHistoryMapper {
     public static GameHistoryListItemResponse toListItem(GameHistory entity) {
         return GameHistoryListItemResponse.builder()
                 .historyId(entity.getHistoryId())
+                .schemaVersion(entity.getSchemaVersion())
                 .gameId(entity.getGameId())
                 .gameName(entity.getGameName())
                 .gameVersion(entity.getGameVersion())
@@ -72,6 +77,7 @@ public class GameHistoryMapper {
         return GameHistoryDetailResponse.builder()
                 .historyId(entity.getHistoryId())
                 .userId(entity.getUserId())
+                .schemaVersion(entity.getSchemaVersion())
                 .gameId(entity.getGameId())
                 .gameName(entity.getGameName())
                 .gameVersion(entity.getGameVersion())
