@@ -127,6 +127,10 @@ jobs:
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml up -d
 
+            echo "Nginx 설정 검증 및 무중단 재적용"
+            docker compose --env-file .env -f docker-compose.prod.yml exec -T nginx nginx -t
+            docker compose --env-file .env -f docker-compose.prod.yml exec -T nginx nginx -s reload
+
             echo "AI 서버 준비 상태 확인"
             for attempt in $(seq 1 30); do
               if curl --fail --silent --show-error http://127.0.0.1/ai/health; then
@@ -142,6 +146,16 @@ jobs:
 
               sleep 5
             done
+
+            echo "백엔드와 AI 분석 연결 스모크 테스트"
+            curl --fail --silent --show-error http://127.0.0.1/v3/api-docs > /dev/null
+            analysis_response="$(curl --fail --silent --show-error \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --data '{"history_id":"deployment-smoke"}' \
+              http://127.0.0.1/ai/api/v1/analyze_session)"
+            printf '%s' "$analysis_response" | grep --quiet '"history_id":"deployment-smoke"'
+            echo "백엔드와 AI 분석 스모크 테스트 완료"
 
             docker image prune -f
           REMOTE
