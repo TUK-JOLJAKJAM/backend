@@ -25,7 +25,7 @@ Lightsail IPv4 방화벽에는 TCP 80과 TCP 443이 열려 있어야 합니다. 
 7. Caddy 재생성을 별도 SSH 단계에서 실행합니다.
 8. 새 SSH 세션에서 Caddy 설정과 공개 TLS 인증서를 확인합니다.
 9. Lightsail 내부에서 HTTPS로 Spring OpenAPI와 AI 분석 API에 실제 요청을 보냅니다.
-10. GitHub runner에서 공인 HTTPS 주소로 같은 요청을 다시 보내 외부 연결과 HTTP→HTTPS 리다이렉트를 검증합니다.
+10. GitHub runner에서 공인 HTTPS 주소로 같은 요청을 다시 보내 외부 연결, HTTP→HTTPS 리다이렉트, HSTS와 React Origin의 Spring/AI CORS를 검증합니다.
 
 PR 단계의 `verify-deployment` 워크플로도 AI 전체 테스트, Compose 설정, AI Docker 이미지, Caddy 프록시와 실제 분석 요청을 검증합니다. 배포 중 오류가 발생하면 Compose 상태와 AI/Caddy 최근 로그가 Action 로그에 자동으로 출력됩니다.
 
