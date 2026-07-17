@@ -86,7 +86,12 @@ jobs:
             if curl --fail --silent --show-error http://127.0.0.1:18080/ai/health > /dev/null; then
               break
             fi
-            [ "$attempt" -lt 30 ] || exit 1
+            if [ "$attempt" -eq 30 ]; then
+              echo "AI 프록시 health check가 60초 안에 성공하지 않았습니다."
+              curl --silent --show-error --include http://127.0.0.1:18080/ai/health || true
+              diagnostics
+              exit 1
+            fi
             sleep 2
           done
 
