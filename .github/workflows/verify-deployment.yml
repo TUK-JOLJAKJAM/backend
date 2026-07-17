@@ -5,7 +5,7 @@ on:
     paths:
       - ".github/workflows/**"
       - "docker-compose.prod.yml"
-      - "nginx/**"
+      - "caddy/**"
   workflow_dispatch:
 
 permissions:
@@ -56,18 +56,18 @@ jobs:
       - name: AI 이미지 빌드
         run: docker build --tag refit-ai-server:ci ./refit-ai-server
 
-      - name: AI와 Nginx 실제 라우팅 검증
+      - name: AI와 Caddy 실제 라우팅 검증
         run: |
           set -euo pipefail
 
           cleanup() {
-            docker rm --force refit-ci-nginx refit-ci-ai > /dev/null 2>&1 || true
+            docker rm --force refit-ci-caddy refit-ci-ai > /dev/null 2>&1 || true
             docker network rm refit-ci > /dev/null 2>&1 || true
           }
 
           diagnostics() {
             docker logs refit-ci-ai || true
-            docker logs refit-ci-nginx || true
+            docker logs refit-ci-caddy || true
           }
 
           trap diagnostics ERR
@@ -77,18 +77,19 @@ jobs:
           docker network create refit-ci
           docker run --detach --network refit-ci --name refit-ci-ai \
             --network-alias ai refit-ai-server:ci
-          docker run --detach --network refit-ci --name refit-ci-nginx \
+          docker run --detach --network refit-ci --name refit-ci-caddy \
+            --env PUBLIC_HOST=http://localhost \
             --publish 18080:80 \
-            --volume "${GITHUB_WORKSPACE}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
-            nginx:1.27-alpine
+            --volume "${GITHUB_WORKSPACE}/caddy:/etc/caddy:ro" \
+            caddy:2.11.4-alpine
 
           for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error http://127.0.0.1:18080/ai/health > /dev/null; then
+            if curl --fail --silent --show-error http://localhost:18080/ai/health > /dev/null; then
               break
             fi
             if [ "$attempt" -eq 30 ]; then
               echo "AI 프록시 health check가 60초 안에 성공하지 않았습니다."
-              curl --silent --show-error --include http://127.0.0.1:18080/ai/health || true
+              curl --silent --show-error --include http://localhost:18080/ai/health || true
               diagnostics
               exit 1
             fi
@@ -99,5 +100,5 @@ jobs:
             --request POST \
             --header 'Content-Type: application/json' \
             --data '{"history_id":"pull-request-integration-smoke"}' \
-            http://127.0.0.1:18080/ai/api/v1/analyze_session)"
+            http://localhost:18080/ai/api/v1/analyze_session)"
           printf '%s' "$analysis_response" | grep --quiet '"history_id":"pull-request-integration-smoke"'
